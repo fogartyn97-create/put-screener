@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Put Screener</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+  .header { padding: 24px 32px 16px; border-bottom: 1px solid #1e2330; }
+  .header h1 { font-size: 22px; font-weight: 700; color: #f8fafc; }
+  .header p { font-size: 13px; color: #64748b; margin-top: 4px; }
+
+  .controls { display: flex; gap: 16px; padding: 20px 32px; flex-wrap: wrap; align-items: flex-end; background: #13161f; border-bottom: 1px solid #1e2330; }
+  .control-group { display: flex; flex-direction: column; gap: 4px; }
+  .control-group label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+  .control-group input, .control-group textarea {
+    background: #1e2330; border: 1px solid #2d3748; border-radius: 6px;
+    color: #e2e8f0; padding: 8px 10px; font-size: 13px; outline: none;
+    transition: border-color 0.15s;
+  }
+  .control-group input:focus, .control-group textarea:focus { border-color: #3b82f6; }
+  .control-group input[type=number] { width: 90px; }
+  .control-group textarea { width: 240px; height: 60px; resize: vertical; font-family: monospace; font-size: 12px; }
+
+  .btn { padding: 9px 22px; border-radius: 6px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-primary:disabled { background: #1e3a5f; color: #4a6fa5; cursor: not-allowed; }
+  .btn-danger { background: #ef4444; color: #fff; }
+  .btn-danger:hover { background: #dc2626; }
+
+  .progress-bar-wrap { height: 3px; background: #1e2330; }
+  .progress-bar { height: 3px; background: #3b82f6; width: 0; transition: width 0.3s; }
+
+  .status-bar { padding: 8px 32px; font-size: 12px; color: #64748b; min-height: 32px; display: flex; align-items: center; gap: 12px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: #14532d; color: #4ade80; }
+  .badge-blue { background: #1e3a5f; color: #60a5fa; }
+
+  .table-wrap { padding: 0 32px 32px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; }
+  thead th {
+    padding: 10px 12px; text-align: left; font-size: 11px; color: #64748b;
+    text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #1e2330;
+    cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  thead th:hover { color: #94a3b8; }
+  thead th .sort-arrow { margin-left: 4px; opacity: 0.4; }
+  thead th.sorted .sort-arrow { opacity: 1; color: #3b82f6; }
+  tbody tr { border-bottom: 1px solid #1a1e2b; transition: background 0.1s; }
+  tbody tr:hover { background: #161a27; }
+  tbody td { padding: 11px 12px; }
+
+  .ticker-cell { font-weight: 700; color: #60a5fa; font-size: 14px; }
+  .good { color: #4ade80; }
+  .warn { color: #facc15; }
+  .neutral { color: #94a3b8; }
+
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .pill-rsi-low { background: #14532d; color: #4ade80; }
+  .pill-rsi-mid { background: #451a03; color: #fb923c; }
+  .pill-bb-below { background: #1e1b4b; color: #a78bfa; }
+  .pill-bb-mid { background: #1e2330; color: #94a3b8; }
+
+  .no-results { padding: 48px; text-align: center; color: #4a5568; font-size: 14px; }
+  .spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid #3b82f6; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .tooltip { position: relative; }
+  .tooltip:hover::after {
+    content: attr(data-tip);
+    position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%);
+    background: #1e2330; color: #e2e8f0; padding: 4px 10px; border-radius: 6px;
+    font-size: 11px; white-space: nowrap; z-index: 10;
+  }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; margin-top: 14px; }
+  .tab { background: none; border: none; color: #64748b; font-size: 13px; font-weight: 600; padding: 6px 16px; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+  .tab:hover { color: #94a3b8; background: #1e2330; }
+  .tab.active { background: #3b82f6; color: #fff; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Tracker */
+  .tracker-wrap { padding: 24px 32px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: #13161f; border: 1px solid #1e2330; border-radius: 8px; padding: 14px 16px; }
+  .stat-card .label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-card .value { font-size: 22px; font-weight: 700; color: #f8fafc; margin-top: 4px; }
+  .stat-card .value.green { color: #4ade80; }
+  .stat-card .value.red { color: #f87171; }
+  .stat-card .value.blue { color: #60a5fa; }
+
+  .section-title { font-size: 13px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; margin-top: 24px; }
+
+  .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; background: #13161f; border: 1px solid #1e2330; border-radius: 8px; padding: 16px; margin-bottom: 24px; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+  .form-group input, .form-group select, .form-group textarea {
+    background: #1e2330; border: 1px solid #2d3748; border-radius: 6px;
+    color: #e2e8f0; padding: 7px 10px; font-size: 13px; outline: none;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: #3b82f6; }
+  .form-group input[type=text] { width: 100px; }
+  .form-group input[type=number] { width: 100px; }
+  .form-group input[type=date] { width: 140px; }
+  .form-group select { width: 160px; }
+  .form-group textarea { width: 200px; height: 38px; resize: none; font-size: 12px; font-family: inherit; }
+
+  .pos-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .pos-table th { padding: 9px 12px; text-align: left; font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #1e2330; white-space: nowrap; }
+  .pos-table td { padding: 10px 12px; border-bottom: 1px solid #1a1e2b; vertical-align: middle; }
+  .pos-table tr:hover td { background: #161a27; }
+
+  .status-pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .status-active { background: #1e3a5f; color: #60a5fa; }
+  .status-expired { background: #14532d; color: #4ade80; }
+  .status-closed { background: #2d2020; color: #f87171; }
+  .status-assigned { background: #451a03; color: #fb923c; }
+  .status-rolled { background: #2e1065; color: #c084fc; }
+
+  .icon-btn { background: none; border: none; cursor: pointer; font-size: 15px; padding: 3px 6px; border-radius: 4px; opacity: 0.6; transition: opacity 0.15s; }
+  .icon-btn:hover { opacity: 1; background: #1e2330; }
+
+  .rank-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .rank-table th { padding: 8px 12px; text-align: left; font-size: 11px; color: #64748b; text-transform: uppercase; border-bottom: 1px solid #1e2330; }
+  .rank-table td { padding: 9px 12px; border-bottom: 1px solid #1a1e2b; }
+
+  .chain-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; background: #2e1065; color: #c084fc; margin-left: 4px; }
+
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100; align-items:center; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:#13161f; border:1px solid #2d3748; border-radius:10px; padding:24px; min-width:360px; max-width:500px; width:90%; }
+  .modal h3 { font-size:15px; font-weight:700; color:#f8fafc; margin-bottom:16px; }
+  .modal .form-row { background:none; border:none; padding:0; flex-direction:column; }
+  .modal .form-group input, .modal .form-group select, .modal .form-group textarea { width:100% !important; }
+  .modal-btns { display:flex; gap:8px; margin-top:16px; justify-content:flex-end; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Stock Picks for Options</h1>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('screener')">Screener</button>
+    <button class="tab" onclick="switchTab('tracker')">Position Tracker</button>
+  </div>
+</div>
+
+<div class="tab-panel active" id="tab-screener">
+<div class="controls">
+  <div class="control-group tooltip" data-tip="RSI below this value (oversold)">
+    <label>RSI &le;</label>
+    <input type="number" id="rsi" value="40" min="10" max="60" step="1">
+  </div>
+  <div class="control-group tooltip" data-tip="% B (0=at lower band, 100=at upper band)">
+    <label>%B &le;</label>
+    <input type="number" id="pct_b" value="35" min="0" max="100" step="5">
+  </div>
+  <div class="control-group tooltip" data-tip="ATM put implied volatility (%)">
+    <label>IV ATM &ge; %</label>
+    <input type="number" id="iv" value="20" min="0" max="200" step="5">
+  </div>
+  <div class="control-group tooltip" data-tip="HV Rank over past year (proxy for IV Rank)">
+    <label>IV Rank &ge;</label>
+    <input type="number" id="ivr" value="40" min="0" max="100" step="5">
+  </div>
+  <div class="control-group tooltip" data-tip="Only show stocks above this price">
+    <label>Min Price $</label>
+    <input type="number" id="price_min" value="0" min="0" step="1">
+  </div>
+  <div class="control-group tooltip" data-tip="Only show stocks below this price (0 = no limit)">
+    <label>Max Price $</label>
+    <input type="number" id="price_max" value="0" min="0" step="1">
+  </div>
+  <div class="control-group">
+    <label>Custom Tickers (optional)</label>
+    <textarea id="custom_tickers" placeholder="AAPL, TSLA, NVDA&#10;Leave blank for S&amp;P 500"></textarea>
+  </div>
+  <div class="control-group" style="flex-direction:row; gap:8px;">
+    <button class="btn btn-primary" id="scanBtn" onclick="startScan()">Run Scan</button>
+    <button class="btn btn-danger" id="stopBtn" onclick="stopScan()" style="display:none">Stop</button>
+  </div>
+</div>
+
+<div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+<div class="status-bar" id="statusBar">Ready — configure filters and click Run Scan.</div>
+
+<div class="table-wrap">
+  <table id="resultsTable" style="display:none">
+    <thead>
+      <tr>
+        <th onclick="sortBy('ticker')">Ticker <span class="sort-arrow">&#8597;</span></th>
+        <th onclick="sortBy('price')">Price <span class="sort-arrow">&#8597;</span></th>
+        <th onclick="sortBy('rsi')">RSI <span class="sort-arrow">&#8597;</span></th>
+        <th onclick="sortBy('pct_b')">%B <span class="sort-arrow">&#8597;</span></th>
+        <th onclick="sortBy('lower_bb')">Lower BB <span class="sort-arrow">&#8597;</span></th>
+        <th onclick="sortBy('iv_atm')">IV ATM % <span class="sort-arrow">&#8597;</span></th>
+        <th onclick="sortBy('iv_rank')">IV Rank <span class="sort-arrow">&#8597;</span></th>
+        <th onclick="sortBy('hv30')">HV 30d % <span class="sort-arrow">&#8597;</span></th>
+      </tr>
+    </thead>
+    <tbody id="resultsBody"></tbody>
+  </table>
+  <div id="noResults" class="no-results" style="display:none">No stocks matched your criteria. Try loosening the filters.</div>
+</div>
+</div><!-- end tab-screener -->
+
+<!-- ───────────────────────── TRACKER TAB ───────────────────────── -->
+<div class="tab-panel" id="tab-tracker">
+<div class="tracker-wrap">
+
+  <!-- Stats cards -->
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-card"><div class="label">Total P&L</div><div class="value" id="st-pnl">—</div></div>
+    <div class="stat-card"><div class="label">Win Rate</div><div class="value blue" id="st-wr">—</div></div>
+    <div class="stat-card"><div class="label">Avg Credit</div><div class="value" id="st-credit">—</div></div>
+    <div class="stat-card"><div class="label">Active</div><div class="value blue" id="st-active">—</div></div>
+    <div class="stat-card"><div class="label">Closed</div><div class="value" id="st-closed">—</div></div>
+    <div class="stat-card"><div class="label">Total Trades</div><div class="value" id="st-total">—</div></div>
+  </div>
+
+  <!-- Add position form -->
+  <div class="section-title">Add New Position</div>
+  <div class="form-row">
+    <div class="form-group"><label>Ticker</label><input type="text" id="f-ticker" placeholder="AAPL" style="width:80px; text-transform:uppercase"></div>
+    <div class="form-group"><label>Strike $</label><input type="number" id="f-strike" placeholder="150" step="0.5"></div>
+    <div class="form-group"><label>Credit / share</label><input type="number" id="f-credit" placeholder="1.50" step="0.01"></div>
+    <div class="form-group"><label>Contracts</label><input type="number" id="f-contracts" placeholder="1" min="1" value="1" style="width:70px"></div>
+    <div class="form-group"><label>Expiration</label><input type="date" id="f-exp"></div>
+    <div class="form-group"><label>Open Date</label><input type="date" id="f-open"></div>
+    <div class="form-group"><label>Notes</label><textarea id="f-notes" placeholder="Optional..."></textarea></div>
+    <div class="form-group"><label>&nbsp;</label><button class="btn btn-primary" onclick="addPosition()">Add Position</button></div>
+  </div>
+
+  <!-- Positions table -->
+  <div class="section-title">All Positions</div>
+  <div style="overflow-x:auto">
+    <table class="pos-table">
+      <thead>
+        <tr>
+          <th>Ticker</th><th>Strike</th><th>Credit/sh</th><th>Contracts</th>
+          <th>Total Credit</th><th>Expiration</th><th>Open</th>
+          <th>Status</th><th>Outcome</th><th>P&L</th><th>Chain</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="posBody"></tbody>
+    </table>
+    <div id="noPos" style="padding:40px; text-align:center; color:#4a5568; font-size:14px; display:none">No positions yet. Add your first trade above.</div>
+  </div>
+
+  <!-- Stock rankings -->
+  <div class="section-title">Stock Rankings (by P&L)</div>
+  <div style="overflow-x:auto; max-width:600px">
+    <table class="rank-table">
+      <thead><tr><th>#</th><th>Ticker</th><th>Trades</th><th>Win Rate</th><th>Total P&L</th></tr></thead>
+      <tbody id="rankBody"></tbody>
+    </table>
+    <div id="noRank" style="padding:20px; color:#4a5568; font-size:13px; display:none">No closed positions yet.</div>
+  </div>
+
+</div>
+</div><!-- end tab-tracker -->
+
+<!-- Close/Update modal -->
+<div class="modal-overlay" id="closeModal">
+  <div class="modal">
+    <h3>Close Position</h3>
+    <input type="hidden" id="m-id">
+    <div class="form-row">
+      <div class="form-group"><label>Outcome</label>
+        <select id="m-outcome" style="width:100%">
+          <option value="expired">Expired Worthless ✅</option>
+          <option value="closed">Closed Manually</option>
+          <option value="rolled">Rolled</option>
+          <option value="assigned">Assigned (stock)</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Close Date</label><input type="date" id="m-date" style="width:100%"></div>
+      <div class="form-group"><label>Debit to Close / share (0 if expired)</label><input type="number" id="m-debit" value="0" step="0.01" style="width:100%"></div>
+      <div class="form-group"><label>Notes</label><textarea id="m-notes" style="width:100%; height:50px"></textarea></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn" style="background:#1e2330;color:#94a3b8" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitClose()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Roll modal -->
+<div class="modal-overlay" id="rollModal">
+  <div class="modal">
+    <h3>Roll Position</h3>
+    <p style="font-size:12px;color:#64748b;margin-bottom:14px">First closes the original, then opens a new linked position.</p>
+    <input type="hidden" id="r-from-id">
+    <div class="form-row">
+      <div class="form-group"><label>New Strike $</label><input type="number" id="r-strike" step="0.5" style="width:100%"></div>
+      <div class="form-group"><label>New Credit / share</label><input type="number" id="r-credit" step="0.01" style="width:100%"></div>
+      <div class="form-group"><label>New Expiration</label><input type="date" id="r-exp" style="width:100%"></div>
+      <div class="form-group"><label>Debit to close original / share</label><input type="number" id="r-debit" value="0" step="0.01" style="width:100%"></div>
+      <div class="form-group"><label>Roll Date</label><input type="date" id="r-date" style="width:100%"></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn" style="background:#1e2330;color:#94a3b8" onclick="closeRollModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitRoll()">Roll</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let pollTimer = null;
+let allResults = [];
+let sortCol = 'rsi';
+let sortAsc = true;
+
+function startScan() {
+  const rsi = document.getElementById('rsi').value;
+  const pct_b = document.getElementById('pct_b').value;
+  const iv = document.getElementById('iv').value;
+  const ivr = document.getElementById('ivr').value;
+  const price_min = document.getElementById('price_min').value;
+  const price_max = document.getElementById('price_max').value;
+  const raw = document.getElementById('custom_tickers').value.trim();
+  const tickers = raw ? raw.split(/[\n,]+/).map(t => t.trim()).filter(Boolean) : null;
+
+  fetch('/api/scan', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ rsi, pct_b, iv, ivr, price_min, price_max, tickers }),
+  }).then(r => r.json()).then(data => {
+    if (data.error) { setStatus(data.error); resetControls(); return; }
+    // Vercel: response comes back immediately with results
+    if (data.done) {
+      allResults = data.results;
+      renderTable(allResults);
+      setStatus(`Scan complete — <span class="badge badge-green">${allResults.length} match${allResults.length !== 1 ? 'es' : ''}</span> out of ${data.total} tickers scanned.`);
+      resetControls();
+      return;
+    }
+    // Local: poll for results
+    document.getElementById('scanBtn').disabled = true;
+    document.getElementById('stopBtn').style.display = 'inline-block';
+    document.getElementById('resultsTable').style.display = 'none';
+    document.getElementById('noResults').style.display = 'none';
+    allResults = [];
+    renderTable([]);
+    pollTimer = setInterval(pollStatus, 1500);
+  });
+}
+
+function stopScan() {
+  fetch('/api/stop', { method: 'POST' });
+  clearInterval(pollTimer);
+  resetControls();
+  setStatus('Scan stopped.');
+}
+
+function pollStatus() {
+  fetch('/api/status').then(r => r.json()).then(data => {
+    const pct = data.total > 0 ? (data.progress / data.total * 100) : 0;
+    document.getElementById('progressBar').style.width = pct + '%';
+
+    if (data.error) {
+      setStatus('Error: ' + data.error, false);
+      clearInterval(pollTimer); resetControls(); return;
+    }
+
+    if (data.running) {
+      setStatus(`<span class="spinner"></span>Scanning… ${data.progress} / ${data.total} tickers — ${data.results.length} matches so far`, true);
+      if (data.results.length !== allResults.length) {
+        allResults = data.results;
+        renderTable(allResults);
+      }
+    } else {
+      clearInterval(pollTimer);
+      allResults = data.results;
+      renderTable(allResults);
+      const n = allResults.length;
+      setStatus(`Scan complete — <span class="badge badge-green">${n} match${n !== 1 ? 'es' : ''}</span> out of ${data.total} tickers scanned.`, true);
+      document.getElementById('progressBar').style.width = '100%';
+      setTimeout(() => document.getElementById('progressBar').style.width = '0', 2000);
+      resetControls();
+    }
+  });
+}
+
+function resetControls() {
+  document.getElementById('scanBtn').disabled = false;
+  document.getElementById('stopBtn').style.display = 'none';
+}
+
+function setStatus(html, isHtml = true) {
+  document.getElementById('statusBar').innerHTML = isHtml ? html : html;
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = true; }
+  document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
+  event.currentTarget.classList.add('sorted');
+  renderTable(allResults);
+}
+
+function renderTable(data) {
+  const sorted = [...data].sort((a, b) => {
+    const va = a[sortCol] ?? -Infinity;
+    const vb = b[sortCol] ?? -Infinity;
+    if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return sortAsc ? va - vb : vb - va;
+  });
+
+  const tbody = document.getElementById('resultsBody');
+  tbody.innerHTML = '';
+  if (sorted.length === 0) {
+    document.getElementById('resultsTable').style.display = 'none';
+    document.getElementById('noResults').style.display = (allResults.length === 0 && !document.getElementById('scanBtn').disabled) ? 'none' : 'block';
+    return;
+  }
+
+  document.getElementById('resultsTable').style.display = 'table';
+  document.getElementById('noResults').style.display = 'none';
+
+  sorted.forEach(r => {
+    const rsiClass = r.rsi <= 30 ? 'pill-rsi-low' : 'pill-rsi-mid';
+    const bbClass = r.pct_b <= 10 ? 'pill-bb-below' : 'pill-bb-mid';
+    const ivColor = r.iv_atm >= 40 ? 'good' : r.iv_atm >= 25 ? 'warn' : 'neutral';
+    const ivrColor = r.iv_rank >= 70 ? 'good' : r.iv_rank >= 50 ? 'warn' : 'neutral';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="ticker-cell"><a href="https://finance.yahoo.com/quote/${r.ticker}/news" target="_blank" style="color:#60a5fa; text-decoration:none;">${r.ticker}</a></td>
+      <td>$${r.price.toFixed(2)}</td>
+      <td><span class="pill ${rsiClass}">${r.rsi}</span></td>
+      <td><span class="pill ${bbClass}">${r.pct_b}%</span></td>
+      <td>$${r.lower_bb.toFixed(2)}</td>
+      <td class="${ivColor}">${r.iv_atm !== null ? r.iv_atm + '%' : 'N/A'}</td>
+      <td class="${ivrColor}">${r.iv_rank !== null ? r.iv_rank + '' : 'N/A'}</td>
+      <td class="neutral">${r.hv30}%</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Tab switching ──────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'tracker') loadTracker();
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+function today() { return new Date().toISOString().slice(0, 10); }
+function fmt$(n) { if (n == null) return '—'; return (n >= 0 ? '+' : '') + '$' + Math.abs(n).toFixed(2); }
+function fmtPnlColor(n) { if (n == null) return 'neutral'; return n >= 0 ? 'good' : 'red' ; }
+function uuid() { return 'p-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8); }
+
+// ── Browser storage (each visitor keeps their own trades) ──────
+const STORE_KEY = 'putTrackerPositions';
+function getPositions() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+  catch (e) { return []; }
+}
+function savePositions(arr) { localStorage.setItem(STORE_KEY, JSON.stringify(arr)); }
+
+// ── P&L + stats computed in the browser ────────────────────────
+function computePnl(p) {
+  if (p.status === 'active') return null;
+  const credit = p.credit * p.contracts * 100;
+  const debit = (p.close_debit || 0) * p.contracts * 100;
+  return Math.round((credit - debit) * 100) / 100;
+}
+function computeStats(positions) {
+  const closed = positions.filter(p => p.status === 'closed');
+  const active = positions.filter(p => p.status === 'active');
+  const pnls = closed.map(computePnl).filter(v => v != null);
+  const total_pnl = Math.round(pnls.reduce((a, b) => a + b, 0) * 100) / 100;
+  const wins = closed.filter(p => p.outcome === 'expired');
+  const win_rate = closed.length ? Math.round(wins.length / closed.length * 1000) / 10 : 0;
+  const avg_credit = positions.length ? Math.round(positions.reduce((a, p) => a + p.credit, 0) / positions.length * 100) / 100 : 0;
+
+  const map = {};
+  positions.forEach(p => {
+    if (!map[p.ticker]) map[p.ticker] = { ticker: p.ticker, trades: 0, pnl: 0, wins: 0, closed: 0 };
+    map[p.ticker].trades++;
+    const pnl = computePnl(p);
+    if (pnl != null) {
+      map[p.ticker].pnl += pnl;
+      map[p.ticker].closed++;
+      if (p.outcome === 'expired') map[p.ticker].wins++;
+    }
+  });
+  const ticker_stats = Object.values(map).sort((a, b) => b.pnl - a.pnl);
+
+  return {
+    total_positions: positions.length, active: active.length, closed: closed.length,
+    total_pnl, win_rate, avg_credit, ticker_stats,
+  };
+}
+
+// ── Load all tracker data ──────────────────────────────────────
+function loadTracker() {
+  const positions = getPositions().map(p => ({ ...p, pnl: computePnl(p) }));
+  const stats = computeStats(positions);
+  renderStats(stats);
+  renderPositions(positions);
+  renderRankings(stats.ticker_stats);
+}
+
+// ── Stats cards ────────────────────────────────────────────────
+function renderStats(s) {
+  const pnl = s.total_pnl;
+  document.getElementById('st-pnl').textContent = fmt$(pnl);
+  document.getElementById('st-pnl').className = 'value ' + (pnl >= 0 ? 'green' : 'red');
+  document.getElementById('st-wr').textContent = s.win_rate + '%';
+  document.getElementById('st-credit').textContent = '$' + s.avg_credit;
+  document.getElementById('st-active').textContent = s.active;
+  document.getElementById('st-closed').textContent = s.closed;
+  document.getElementById('st-total').textContent = s.total_positions;
+}
+
+// ── Positions table ────────────────────────────────────────────
+function renderPositions(positions) {
+  const tbody = document.getElementById('posBody');
+  document.getElementById('noPos').style.display = positions.length ? 'none' : 'block';
+  tbody.innerHTML = '';
+  positions.slice().reverse().forEach(p => {
+    const totalCredit = (p.credit * p.contracts * 100).toFixed(2);
+    const statusClass = { active: 'status-active', expired: 'status-expired', closed: 'status-closed', assigned: 'status-assigned', rolled: 'status-rolled' }[p.status] || 'status-active';
+    const outcomeLabel = { expired: 'Expired ✅', closed: 'Closed', rolled: 'Rolled 🔄', assigned: 'Assigned ⚠️' }[p.outcome] || '—';
+    const pnlColor = p.pnl >= 0 ? '#4ade80' : '#f87171';
+    const chainBadge = p.rolled_from_id ? '<span class="chain-badge">ROLL</span>' : '';
+    const isActive = p.status === 'active';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><a href="https://finance.yahoo.com/quote/${p.ticker}/news" target="_blank" style="color:#60a5fa;text-decoration:none;font-weight:700">${p.ticker}</a></td>
+      <td>$${p.strike.toFixed(2)}</td>
+      <td>$${p.credit.toFixed(2)}</td>
+      <td>${p.contracts}</td>
+      <td>$${totalCredit}</td>
+      <td>${p.expiration}</td>
+      <td>${p.open_date}</td>
+      <td><span class="status-pill ${statusClass}">${p.status}</span></td>
+      <td>${outcomeLabel}</td>
+      <td style="color:${p.pnl != null ? pnlColor : '#64748b'};font-weight:600">${p.pnl != null ? fmt$(p.pnl) : '—'}</td>
+      <td>${chainBadge}</td>
+      <td>
+        ${isActive ? `<button class="icon-btn" title="Close position" onclick="openCloseModal('${p.id}')">✔️</button>` : ''}
+        ${isActive ? `<button class="icon-btn" title="Roll position" onclick="openRollModal('${p.id}','${p.ticker}',${p.contracts})">🔄</button>` : ''}
+        <button class="icon-btn" title="Delete" onclick="deletePos('${p.id}')">🗑️</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Rankings ───────────────────────────────────────────────────
+function renderRankings(tickers) {
+  const tbody = document.getElementById('rankBody');
+  const withClosed = tickers.filter(t => t.closed > 0);
+  document.getElementById('noRank').style.display = withClosed.length ? 'none' : 'block';
+  tbody.innerHTML = '';
+  withClosed.forEach((t, i) => {
+    const wr = t.closed > 0 ? Math.round(t.wins / t.closed * 100) : 0;
+    const pnlColor = t.pnl >= 0 ? '#4ade80' : '#f87171';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color:#64748b">${i + 1}</td>
+      <td><a href="https://finance.yahoo.com/quote/${t.ticker}/news" target="_blank" style="color:#60a5fa;text-decoration:none;font-weight:700">${t.ticker}</a></td>
+      <td>${t.trades}</td>
+      <td>${wr}%</td>
+      <td style="color:${pnlColor};font-weight:600">${fmt$(t.pnl)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Add position ───────────────────────────────────────────────
+function addPosition() {
+  const ticker = document.getElementById('f-ticker').value.trim().toUpperCase();
+  const strike = parseFloat(document.getElementById('f-strike').value);
+  const credit = parseFloat(document.getElementById('f-credit').value);
+  const contracts = parseInt(document.getElementById('f-contracts').value) || 1;
+  const exp = document.getElementById('f-exp').value;
+  const open = document.getElementById('f-open').value || today();
+  const notes = document.getElementById('f-notes').value;
+
+  if (!ticker || !strike || !credit || !exp) { alert('Fill in Ticker, Strike, Credit, and Expiration.'); return; }
+
+  const positions = getPositions();
+  positions.push({
+    id: uuid(), ticker, strike, credit, contracts,
+    expiration: exp, open_date: open, notes,
+    status: 'active', close_date: null, close_debit: null, outcome: null,
+    roll_chain_id: uuid(), rolled_from_id: null,
+  });
+  savePositions(positions);
+  ['f-ticker','f-strike','f-credit','f-notes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-contracts').value = '1';
+  loadTracker();
+}
+
+// ── Close modal ────────────────────────────────────────────────
+function openCloseModal(id) {
+  document.getElementById('m-id').value = id;
+  document.getElementById('m-date').value = today();
+  document.getElementById('m-debit').value = '0';
+  document.getElementById('m-notes').value = '';
+  document.getElementById('closeModal').classList.add('open');
+}
+function closeModal() { document.getElementById('closeModal').classList.remove('open'); }
+function submitClose() {
+  const id = document.getElementById('m-id').value;
+  const outcome = document.getElementById('m-outcome').value;
+  const close_date = document.getElementById('m-date').value;
+  const close_debit = parseFloat(document.getElementById('m-debit').value) || 0;
+  const notes = document.getElementById('m-notes').value;
+  const positions = getPositions();
+  const p = positions.find(x => x.id === id);
+  if (p) {
+    p.outcome = outcome; p.close_date = close_date; p.close_debit = close_debit;
+    p.status = 'closed';
+    if (notes) p.notes = notes;
+    savePositions(positions);
+  }
+  closeModal(); loadTracker();
+}
+
+// ── Roll modal ─────────────────────────────────────────────────
+let _rollTicker = ''; let _rollContracts = 1;
+function openRollModal(id, ticker, contracts) {
+  _rollTicker = ticker; _rollContracts = contracts;
+  document.getElementById('r-from-id').value = id;
+  document.getElementById('r-date').value = today();
+  document.getElementById('r-debit').value = '0';
+  document.getElementById('rollModal').classList.add('open');
+}
+function closeRollModal() { document.getElementById('rollModal').classList.remove('open'); }
+function submitRoll() {
+  const fromId = document.getElementById('r-from-id').value;
+  const strike = parseFloat(document.getElementById('r-strike').value);
+  const credit = parseFloat(document.getElementById('r-credit').value);
+  const exp = document.getElementById('r-exp').value;
+  const debit = parseFloat(document.getElementById('r-debit').value) || 0;
+  const rollDate = document.getElementById('r-date').value;
+
+  if (!strike || !credit || !exp) { alert('Fill in all roll fields.'); return; }
+
+  const positions = getPositions();
+  const orig = positions.find(x => x.id === fromId);
+  // Close original as rolled
+  if (orig) {
+    orig.outcome = 'rolled'; orig.close_date = rollDate; orig.close_debit = debit; orig.status = 'closed';
+  }
+  // Open new linked position, inheriting the roll chain id
+  const chainId = orig ? orig.roll_chain_id : uuid();
+  positions.push({
+    id: uuid(), ticker: _rollTicker, strike, credit, contracts: _rollContracts,
+    expiration: exp, open_date: rollDate, notes: '',
+    status: 'active', close_date: null, close_debit: null, outcome: null,
+    roll_chain_id: chainId, rolled_from_id: fromId,
+  });
+  savePositions(positions);
+  closeRollModal(); loadTracker();
+}
+
+// ── Delete ─────────────────────────────────────────────────────
+function deletePos(id) {
+  if (!confirm('Delete this position?')) return;
+  savePositions(getPositions().filter(p => p.id !== id));
+  loadTracker();
+}
+
+// Set default dates on load
+document.getElementById('f-open').value = today();
+</script>
+</body>
+</html>
